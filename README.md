@@ -36,7 +36,7 @@ network status, battery status, and VPN connectivity.
 Edit config.mk to match your local setup (i is installed into
 the /usr/local namespace by default).
 
-Afterwards enter the following command to build and install sysinfo
+Afterwards enter the following command to build and install i
 (if necessary as root):
 
     make clean install
