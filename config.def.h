@@ -24,9 +24,16 @@ static const struct {
 /* battery path - adjust for your system */
 static const char *battery_path = "/sys/class/power_supply/BAT0";
 
-/* commands for power management (requires appropriate sudo permissions) */
-static const char *reboot_cmd = "/usr/bin/doas /sbin/reboot";
-static const char *shutdown_cmd = "/usr/bin/doas /sbin/shutdown -h now";
+/* commands for power management (adjust for your system) */
+/* Common alternatives:
+ * sudo systems: "sudo reboot", "sudo shutdown -h now"
+ * doas systems: "doas reboot", "doas shutdown -h now" 
+ * systemd: "systemctl reboot", "systemctl poweroff"
+ * OpenBSD: "doas /sbin/reboot", "doas /sbin/shutdown -h now"
+ * FreeBSD: "sudo /sbin/reboot", "sudo /sbin/shutdown -h now"
+ */
+static const char *reboot_cmd = "PATH=/usr/bin:/bin:/sbin:/usr/sbin doas reboot";
+static const char *shutdown_cmd = "PATH=/usr/bin:/bin:/sbin:/usr/sbin doas shutdown -h now";
 
 /* ASCII art definitions for different operating systems */
 static const char *ascii_alpine[] = {
