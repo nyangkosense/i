@@ -40,12 +40,8 @@ install: all
 	mkdir -p ${DESTDIR}${PREFIX}/bin
 	cp -f i ${DESTDIR}${PREFIX}/bin
 	chmod 755 ${DESTDIR}${PREFIX}/bin/i
-	mkdir -p ${DESTDIR}${MANPREFIX}/man1
-	sed "s/VERSION/${VERSION}/g" < i.1 > ${DESTDIR}${MANPREFIX}/man1/i.1
-	chmod 644 ${DESTDIR}${MANPREFIX}/man1/i.1
 
 uninstall:
-	rm -f ${DESTDIR}${PREFIX}/bin/i \
-		${DESTDIR}${MANPREFIX}/man1/i.1
+	rm -f ${DESTDIR}${PREFIX}/bin/i
 
 .PHONY: all options clean dist install uninstall
