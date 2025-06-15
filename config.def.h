@@ -25,8 +25,8 @@ static const struct {
 static const char *battery_path = "/sys/class/power_supply/BAT0";
 
 /* commands for power management (requires appropriate sudo permissions) */
-static const char *reboot_cmd = "/usr/bin/doas reboot";
-static const char *shutdown_cmd = "/usr/bin/doas shutdown -h now";
+static const char *reboot_cmd = "/usr/bin/doas /sbin/reboot";
+static const char *shutdown_cmd = "/usr/bin/doas /sbin/shutdown -h now";
 
 /* ASCII art definitions for different operating systems */
 static const char *ascii_alpine[] = {
