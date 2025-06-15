@@ -16,5 +16,9 @@ CPPFLAGS = -D_DEFAULT_SOURCE -D_BSD_SOURCE -D_POSIX_C_SOURCE=200809L -DVERSION=\
 CFLAGS   = -std=c99 -pedantic -Wall -Wextra -Os ${INCS} ${CPPFLAGS}
 LDFLAGS  = ${LIBS}
 
+# static linking flags (uncomment to build static binary)
+#CFLAGS   = -std=c99 -pedantic -Wall -Wextra -Os ${INCS} ${CPPFLAGS} -static
+#LDFLAGS  = ${LIBS} -static
+
 # compiler and linker
 CC = cc
