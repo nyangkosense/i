@@ -19,6 +19,11 @@
 #include <pwd.h>
 #include <sys/utsname.h>
 
+/* IPv6 */
+#ifndef AF_INET6
+#define AF_INET6 10
+#endif
+
 #include "termbox2.h"
 
 #include "config.h"
@@ -213,6 +218,8 @@ getnetworkstatus(char *buffer)
 	struct ifaddrs *ifaddr, *ifa;
 	int connectedinterfaces;
 	char interfacelist[MAXSTRLEN];
+	char seen_interfaces[32][64]; /* Track seen interface names */
+	int seen_count = 0;
 
 	connectedinterfaces = 0;
 	interfacelist[0] = '\0';
@@ -223,24 +230,49 @@ getnetworkstatus(char *buffer)
 	}
 
 	for (ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next) {
+		int already_seen, i;
+		
+		already_seen = 0;
+		
 		if (ifa->ifa_addr == NULL)
 			continue;
 
-		if (ifa->ifa_addr->sa_family == AF_INET &&
+		if ((ifa->ifa_addr->sa_family == AF_INET || ifa->ifa_addr->sa_family == AF_INET6) &&
 		    strcmp(ifa->ifa_name, "lo") != 0) {
-			if (connectedinterfaces > 0)
-				strcat(interfacelist, ", ");
-			strcat(interfacelist, ifa->ifa_name);
-			connectedinterfaces++;
+			
+			/* Check if we've already seen this interface */
+			for (i = 0; i < seen_count; i++) {
+				if (strcmp(seen_interfaces[i], ifa->ifa_name) == 0) {
+					already_seen = 1;
+					break;
+				}
+			}
+			
+			if (!already_seen && seen_count < 32) {
+				strcpy(seen_interfaces[seen_count], ifa->ifa_name);
+				seen_count++;
+				
+				if (connectedinterfaces > 0)
+					strcat(interfacelist, ", ");
+				strcat(interfacelist, ifa->ifa_name);
+				connectedinterfaces++;
+			}
 		}
 	}
 
 	freeifaddrs(ifaddr);
 
-	if (connectedinterfaces > 0)
+	if (connectedinterfaces > 0) {
+		int remaining;
+		
+		remaining = MAXSTRLEN - 12; /* "Connected: " = 11 chars + null */
+		if (strlen(interfacelist) >= remaining) {
+			interfacelist[remaining - 1] = '\0'; /* Ensure it fits */
+		}
 		snprintf(buffer, MAXSTRLEN, "Connected: %s", interfacelist);
-	else
+	} else {
 		strcpy(buffer, "No network connection");
+	}
 }
 
 static void
@@ -296,10 +328,14 @@ getipaddress(char *buffer)
 	FILE *fp;
 	char line[256];
 
-	fp = popen("ip route get 8.8.8.8 2>/dev/null | awk '/src/ {print $7}' | head -1", "r");
+	fp = popen("(ip route get 8.8.8.8 2>/dev/null | awk '/src/ {print $7}'; ip -6 route get 2001:4860:4860::8888 2>/dev/null | awk '/src/ {print $9}') | head -1", "r");
 	if (fp) {
 		if (fgets(line, sizeof(line), fp)) {
 			line[strcspn(line, "\n")] = 0;
+			/* Ensure IPv6 addresses fit: max 39 chars + "IP: " = 43 total */
+			if (strlen(line) > MAXSTRLEN - 5) {
+				line[MAXSTRLEN - 5] = '\0';
+			}
 			snprintf(buffer, MAXSTRLEN, "IP: %s", line);
 		} else {
 			strcpy(buffer, "IP: Unknown");
@@ -320,6 +356,7 @@ getgateway(char *buffer)
 	if (fp) {
 		if (fgets(line, sizeof(line), fp)) {
 			line[strcspn(line, "\n")] = 0;
+			line[MAXSTRLEN - 10] = '\0'; /* "Gateway: " = 9 chars + null */
 			snprintf(buffer, MAXSTRLEN, "Gateway: %s", line);
 		} else {
 			strcpy(buffer, "Gateway: Unknown");
@@ -343,6 +380,7 @@ getdns(char *buffer)
 				char *dns = line + 10;
 				while (*dns == ' ' || *dns == '\t') dns++;
 				dns[strcspn(dns, "\n")] = 0;
+				dns[MAXSTRLEN - 6] = '\0'; /* "DNS: " = 5 chars + null */
 				snprintf(buffer, MAXSTRLEN, "DNS: %s", dns);
 				fclose(fp);
 				return;
@@ -581,6 +619,8 @@ drawasciiart(const char **art, int x, int y, int width, int height, uint16_t fg,
 {
 	int i, j, artlines, start_y, start_x;
 
+	(void)bg; /* Intentionally unused */
+
 	if (!art)
 		return;
 
@@ -665,6 +705,7 @@ displayinfo(const SysInfo *info)
 
 	ascii_box_width = (hex_width - 8) / 6;
 	if (ascii_box_width < 20) ascii_box_width = 20;
+	if (ascii_box_width > 40) ascii_box_width = 40; /* Limit ASCII box size */
 	system_box_width = hex_width - ascii_box_width - 6;
 	system_box_x = 2 + ascii_box_width + 2;
 
