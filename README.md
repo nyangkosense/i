@@ -2,6 +2,9 @@
 
 A minimalist system information utility with a hex dump aesthetic.
 
+![sysinfo demo](demo.png)
+
+
 ![sysinfo demo](demo.gif)
 
 ## Description
