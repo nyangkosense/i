@@ -30,6 +30,7 @@
 
 #define MAXSTRLEN 256
 
+/* Types */
 typedef struct {
 	char timestr[MAXSTRLEN];
 	char uptimestr[MAXSTRLEN];
@@ -44,6 +45,8 @@ typedef struct {
 	char dnsstr[MAXSTRLEN];
 } SysInfo;
 
+
+/* Function declarations */
 static void usage(void);
 static void die(const char *msg);
 static void printcenteredin(const char *str, int x, int y, int width, uint16_t fg, uint16_t bg);
@@ -266,7 +269,7 @@ getnetworkstatus(char *buffer)
 		int remaining;
 		
 		remaining = MAXSTRLEN - 12; /* "Connected: " = 11 chars + null */
-		if (strlen(interfacelist) >= remaining) {
+		if ((int)strlen(interfacelist) >= remaining) {
 			interfacelist[remaining - 1] = '\0'; /* Ensure it fits */
 		}
 		snprintf(buffer, MAXSTRLEN, "Connected: %s", interfacelist);
@@ -473,8 +476,6 @@ drawhexbanner(int x, int y, int width, uint16_t fg, uint16_t bg)
 static void
 drawhexbackground(int width, int height)
 {
-	char hexline[512];
-	char hexdata[128];
 	char asciidata[64];
 	int addr, i, j, bytes_per_line, max_bytes, pos;
 	unsigned char byte;
@@ -609,55 +610,20 @@ detectsystem(char *buffer)
 static const char **
 getasciiart(const char *system)
 {
+	int i;
+	
 	if (!system)
 		return ascii_linux;
 
-	if (strcmp(system, "alpine") == 0)
-		return ascii_alpine;
-	if (strcmp(system, "android") == 0)
-		return ascii_android;
-	if (strcmp(system, "arch") == 0)
-		return ascii_arch;
-	if (strcmp(system, "arco") == 0)
-		return ascii_arco;
-	if (strcmp(system, "artix") == 0)
-		return ascii_artix;
-	if (strcmp(system, "centos") == 0)
-		return ascii_centos;
-	if (strcmp(system, "debian") == 0)
-		return ascii_debian;
-	if (strcmp(system, "endeavouros") == 0)
-		return ascii_endeavour;
-	if (strcmp(system, "fedora") == 0)
-		return ascii_fedora;
-	if (strcmp(system, "freebsd") == 0)
-		return ascii_freebsd;
-	if (strcmp(system, "gentoo") == 0)
-		return ascii_gentoo;
-	if (strcmp(system, "linuxmint") == 0)
-		return ascii_linux_mint;
+	for (i = 0; ascii_mappings[i].name != NULL; i++) {
+		if (strcmp(system, ascii_mappings[i].name) == 0)
+			return ascii_mappings[i].art;
+	}
+	
 	if (strstr(system, "mint") != NULL)
 		return ascii_linux_mint;
-	if (strcmp(system, "darwin") == 0)
-		return ascii_macos;
-	if (strcmp(system, "manjaro") == 0)
-		return ascii_manjaro;
-	if (strcmp(system, "nixos") == 0)
-		return ascii_nixos;
-	if (strcmp(system, "opensuse") == 0)
-		return ascii_opensuse;
-	if (strcmp(system, "pop") == 0)
-		return ascii_pop_os;
 	if (strstr(system, "pop") != NULL)
 		return ascii_pop_os;
-	if (strcmp(system, "slackware") == 0)
-		return ascii_slackware;
-	if (strcmp(system, "solus") == 0)
-		return ascii_solus;
-	if (strcmp(system, "ubuntu") == 0)
-		return ascii_ubuntu;
-	if (strcmp(system, "void") == 0)
-		return ascii_void;
 
 	return ascii_linux;
 }

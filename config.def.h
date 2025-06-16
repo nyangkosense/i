@@ -9,6 +9,11 @@ static const double hex_refresh_interval = 0.5;
 /* enable terminal color display in hex background (1 = enabled, 0 = monochrome) */
 static const int enable_colored_hex = 1;
 
+typedef struct {
+	const char *name;
+	const char **art;
+} AsciiMapping;
+
 /* appearance */
 static const struct {
 	uint16_t fg;
@@ -39,6 +44,7 @@ static const char *reboot_cmd = "PATH=/usr/bin:/bin:/sbin:/usr/sbin doas reboot"
 static const char *shutdown_cmd = "PATH=/usr/bin:/bin:/sbin:/usr/sbin doas shutdown -h now";
 
 /* ASCII art definitions for different operating systems */
+
 static const char *ascii_alpine[] = {
 	"   /\\ /\\",
 	"  /./ \\  \\",
@@ -275,4 +281,30 @@ static const char *ascii_void[] = {
 	"| \\______ \\_|",
 	" -_______\\",
 	NULL
+};
+
+/* ASCII art mappings table */
+static const AsciiMapping ascii_mappings[] = {
+	{"alpine", ascii_alpine},
+	{"android", ascii_android},
+	{"arch", ascii_arch},
+	{"arco", ascii_arco},
+	{"artix", ascii_artix},
+	{"centos", ascii_centos},
+	{"darwin", ascii_macos},
+	{"debian", ascii_debian},
+	{"endeavouros", ascii_endeavour},
+	{"fedora", ascii_fedora},
+	{"freebsd", ascii_freebsd},
+	{"gentoo", ascii_gentoo},
+	{"linuxmint", ascii_linux_mint},
+	{"manjaro", ascii_manjaro},
+	{"nixos", ascii_nixos},
+	{"opensuse", ascii_opensuse},
+	{"pop", ascii_pop_os},
+	{"slackware", ascii_slackware},
+	{"solus", ascii_solus},
+	{"ubuntu", ascii_ubuntu},
+	{"void", ascii_void},
+	{NULL, NULL}
 };
