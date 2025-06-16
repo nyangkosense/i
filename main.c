@@ -330,22 +330,61 @@ getipaddress(char *buffer)
 {
 	FILE *fp;
 	char line[256];
+	const char *targets[] = {
+		"1.1.1.1",      /* Cloudflare DNS */
+		"8.8.8.8",      /* Google DNS */
+		"9.9.9.9",      /* Quad9 DNS */
+		"208.67.222.222" /* OpenDNS */
+	};
+	int i;
 
-	fp = popen("(ip route get 8.8.8.8 2>/dev/null | awk '/src/ {print $7}'; ip -6 route get 2001:4860:4860::8888 2>/dev/null | awk '/src/ {print $9}') | head -1", "r");
+	strcpy(buffer, "IP: Unknown");
+
+	/* Try multiple DNS servers for reliability */
+	for (i = 0; i < 4; i++) {
+		char cmd[256];
+		snprintf(cmd, sizeof(cmd), "ip route get %s 2>/dev/null", targets[i]);
+		
+		fp = popen(cmd, "r");
+		if (!fp)
+			continue;
+
+		if (fgets(line, sizeof(line), fp)) {
+			char *src_pos = strstr(line, " src ");
+			if (src_pos) {
+				char *ip_start = src_pos + 5; /* Skip " src " */
+				char *ip_end = strchr(ip_start, ' ');
+				if (ip_end)
+					*ip_end = '\0';
+				
+				/* Validate IP format and length */
+				if (strlen(ip_start) > 6 && strlen(ip_start) < 40) {
+					line[strcspn(ip_start, "\n")] = 0;
+					if (strlen(ip_start) > MAXSTRLEN - 5) {
+						ip_start[MAXSTRLEN - 5] = '\0';
+					}
+					snprintf(buffer, MAXSTRLEN, "IP: %s", ip_start);
+					pclose(fp);
+					return; /* Success, exit early */
+				}
+			}
+		}
+		pclose(fp);
+	}
+
+	/* Fallback: try getting IP from active interfaces */
+	fp = popen("ip addr show | grep 'inet ' | grep -v '127.0.0.1' | head -1 | awk '{print $2}' | cut -d'/' -f1", "r");
 	if (fp) {
 		if (fgets(line, sizeof(line), fp)) {
 			line[strcspn(line, "\n")] = 0;
-			/* Ensure IPv6 addresses fit: max 39 chars + "IP: " = 43 total */
-			if (strlen(line) > MAXSTRLEN - 5) {
-				line[MAXSTRLEN - 5] = '\0';
+			if (strlen(line) > 6 && strlen(line) < 40) {
+				if (strlen(line) > MAXSTRLEN - 5) {
+					line[MAXSTRLEN - 5] = '\0';
+				}
+				snprintf(buffer, MAXSTRLEN, "IP: %s", line);
 			}
-			snprintf(buffer, MAXSTRLEN, "IP: %s", line);
-		} else {
-			strcpy(buffer, "IP: Unknown");
 		}
 		pclose(fp);
-	} else {
-		strcpy(buffer, "IP: Unknown");
 	}
 }
 
