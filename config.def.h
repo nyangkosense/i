@@ -4,7 +4,10 @@
 static const int refresh_interval = 1;
 
 /* hex background refresh interval in seconds (can be fractional) */
-static const double hex_refresh_interval = 2;
+static const double hex_refresh_interval = 0.5;
+
+/* enable terminal color display in hex background (1 = enabled, 0 = monochrome) */
+static const int enable_colored_hex = 1;
 
 /* appearance */
 static const struct {

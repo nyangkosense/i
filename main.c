@@ -476,8 +476,16 @@ drawhexbackground(int width, int height)
 	char hexline[512];
 	char hexdata[128];
 	char asciidata[64];
-	int addr, i, j, bytes_per_line, max_bytes;
+	int addr, i, j, bytes_per_line, max_bytes, pos;
 	unsigned char byte;
+	uint16_t terminal_colors[16] = {
+		TB_BLACK, TB_RED, TB_GREEN, TB_YELLOW,
+		TB_BLUE, TB_MAGENTA, TB_CYAN, TB_WHITE,
+		TB_BLACK | TB_BRIGHT, TB_RED | TB_BRIGHT, 
+		TB_GREEN | TB_BRIGHT, TB_YELLOW | TB_BRIGHT,
+		TB_BLUE | TB_BRIGHT, TB_MAGENTA | TB_BRIGHT, 
+		TB_CYAN | TB_BRIGHT, TB_WHITE | TB_BRIGHT
+	};
 	
 	struct timeval tv;
 	gettimeofday(&tv, NULL);
@@ -493,33 +501,73 @@ drawhexbackground(int width, int height)
 	for (i = 0; i < height; i++) {
 		addr = i * bytes_per_line;
 		
+		/* First render the address */
+		char addr_str[16];
+		snprintf(addr_str, sizeof(addr_str), "%08x  ", addr);
+		printat(addr_str, 0, i, TB_BLACK | TB_BRIGHT, TB_DEFAULT);
+		pos = 10;
+		
+		/* Render hex bytes with colors */
 		for (j = 0; j < bytes_per_line; j++) {
 			seed = (seed * 1103515245 + 12345) & 0x7FFFFFFF;
 			byte = (seed >> 16) & 0xFF;
 			
+			/* Bias towards terminal color values */
+			if ((seed & 0x1F) < 8) {
+				byte = (seed >> 8) & 0x0F; /* 0-15 range for terminal colors */
+			}
+			
 			if (j % 4 == 0) byte &= 0xF0; /* Some aligned data */
 			if (j == bytes_per_line/2) byte = 0x00; /* Null bytes */
 			
-			sprintf(hexdata + (j * 3), "%02x ", byte);
+			char hex_pair[4];
+			snprintf(hex_pair, sizeof(hex_pair), "%02x", byte);
+			
+			/* Color hex values that match terminal color indices */
+			uint16_t color = TB_BLACK | TB_BRIGHT;
+			if (enable_colored_hex) {
+				if (byte < 16) {
+					color = terminal_colors[byte];
+				} else if ((byte & 0x0F) < 16) {
+					color = terminal_colors[byte & 0x0F];
+				}
+			}
+			
+			/* Render the two hex digits */
+			tb_set_cell(pos, i, hex_pair[0], color, TB_DEFAULT);
+			tb_set_cell(pos + 1, i, hex_pair[1], color, TB_DEFAULT);
+			
+			/* Add space after hex pair */
+			tb_set_cell(pos + 2, i, ' ', TB_BLACK | TB_BRIGHT, TB_DEFAULT);
+			pos += 3;
+			
+			/* Add extra space in the middle */
+			if (j == bytes_per_line/2 - 1) {
+				tb_set_cell(pos, i, ' ', TB_BLACK | TB_BRIGHT, TB_DEFAULT);
+				pos++;
+			}
+			
 			asciidata[j] = (byte >= 32 && byte <= 126) ? byte : '.';
 		}
-		hexdata[bytes_per_line * 3 - 1] = '\0'; /* Remove last space */
+		
+		/* Render ASCII section */
 		asciidata[bytes_per_line] = '\0';
+		tb_set_cell(pos, i, '|', TB_BLACK | TB_BRIGHT, TB_DEFAULT);
+		pos++;
 		
-		int mid = (bytes_per_line / 2) * 3;
-		memmove(hexdata + mid + 1, hexdata + mid, strlen(hexdata + mid) + 1);
-		hexdata[mid] = ' ';
-		
-		snprintf(hexline, sizeof(hexline), "%08x  %s |%s|", 
-		         addr, hexdata, asciidata);
-		
-		int len = strlen(hexline);
-		while (len < width - 1) {
-			hexline[len++] = ' ';
+		for (j = 0; j < bytes_per_line; j++) {
+			tb_set_cell(pos + j, i, asciidata[j], TB_BLACK | TB_BRIGHT, TB_DEFAULT);
 		}
-		hexline[width - 1] = '\0';
+		pos += bytes_per_line;
 		
-		printat(hexline, 0, i, TB_BLACK | TB_BRIGHT, TB_DEFAULT);
+		tb_set_cell(pos, i, '|', TB_BLACK | TB_BRIGHT, TB_DEFAULT);
+		pos++;
+		
+		/* Fill remaining space */
+		while (pos < width) {
+			tb_set_cell(pos, i, ' ', TB_BLACK | TB_BRIGHT, TB_DEFAULT);
+			pos++;
+		}
 	}
 }
 
@@ -617,25 +665,54 @@ getasciiart(const char *system)
 static void
 drawasciiart(const char **art, int x, int y, int width, int height, uint16_t fg, uint16_t bg)
 {
-	int i, j, artlines, start_y, start_x;
+	int i, j, artlines, start_y;
+	int max_line_width, line_width;
+	int usable_width, usable_height;
 
 	(void)bg; /* Intentionally unused */
 
 	if (!art)
 		return;
 
-	for (artlines = 0; art[artlines] != NULL; artlines++)
-		;
+	/* Calculate number of lines and find maximum line width */
+	artlines = 0;
+	max_line_width = 0;
+	while (art[artlines] != NULL) {
+		line_width = strlen(art[artlines]);
+		if (line_width > max_line_width)
+			max_line_width = line_width;
+		artlines++;
+	}
 
-	start_y = y + 1 + (height - 2 - artlines) / 2;
+	/* Calculate usable space within the box borders */
+	usable_width = width - 2; /* Account for left and right borders */
+	usable_height = height - 2; /* Account for top and bottom borders */
+
+	/* Don't render if ASCII art is too large for the box */
+	if (artlines > usable_height || max_line_width > usable_width)
+		return;
+
+	/* Calculate vertical centering */
+	start_y = y + 1 + (usable_height - artlines) / 2;
 	if (start_y < y + 1)
 		start_y = y + 1;
 
+	/* Calculate horizontal centering based on the widest line */
+	int base_start_x = x + 1 + (usable_width - max_line_width) / 2;
+	if (base_start_x < x + 1)
+		base_start_x = x + 1;
+	
+	/* Ensure the entire ASCII art fits within the box */
+	if (base_start_x + max_line_width > x + width - 1)
+		base_start_x = x + width - 1 - max_line_width;
+
+	/* Render each line using the same base horizontal position */
 	for (i = 0; i < artlines && start_y + i < y + height - 1; i++) {
-		start_x = x + 1;
+		line_width = strlen(art[i]);
 		
-		for (j = 0; art[i][j] && start_x + j < x + width - 1; j++) {
-			tb_set_cell(start_x + j, start_y + i, art[i][j], fg, TB_BLACK);
+		/* Render the line character by character */
+		for (j = 0; j < line_width && base_start_x + j < x + width - 1; j++) {
+			tb_set_cell(base_start_x + j, start_y + i, art[i][j], fg, TB_BLACK);
 		}
 	}
 }
@@ -704,8 +781,8 @@ displayinfo(const SysInfo *info)
 	hex_width = 10 + (bytes_per_line * 3) + 1 + bytes_per_line + 1; /* addr + hex + space + ascii + | */
 
 	ascii_box_width = (hex_width - 8) / 6;
-	if (ascii_box_width < 20) ascii_box_width = 20;
-	if (ascii_box_width > 40) ascii_box_width = 40; /* Limit ASCII box size */
+	if (ascii_box_width < 25) ascii_box_width = 25; /* Ensure minimum width for ASCII art */
+	if (ascii_box_width > 45) ascii_box_width = 45; /* Allow wider ASCII box */
 	system_box_width = hex_width - ascii_box_width - 6;
 	system_box_x = 2 + ascii_box_width + 2;
 
@@ -784,7 +861,7 @@ displayinfo(const SysInfo *info)
 	printcenteredin(info->gatewaystr, 2 + (hex_width - 6) / 2 + 2, 25, (hex_width - 6) / 2, TB_CYAN, TB_BLACK);
 	printcenteredin(info->dnsstr, 2 + (hex_width - 6) / 2 + 2, 26, (hex_width - 6) / 2, TB_CYAN, TB_BLACK);
 	
-	printcenteredin("Security:", 2 + (hex_width - 6) / 2 + 2, 28, (hex_width - 6) / 2, TB_WHITE | TB_BOLD, TB_BLACK);
+	printcenteredin("Tunnel:", 2 + (hex_width - 6) / 2 + 2, 28, (hex_width - 6) / 2, TB_WHITE | TB_BOLD, TB_BLACK);
 	if (strstr(info->vpnstr, "Active") != NULL) {
 		printcenteredin(info->vpnstr, 2 + (hex_width - 6) / 2 + 2, 29, (hex_width - 6) / 2, TB_GREEN, TB_BLACK);
 	} else {
